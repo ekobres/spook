@@ -137,6 +137,65 @@ data:
 
 :::
 
+## List all disabled entities
+
+Lists all entities that are currently disabled in the entity registry.
+
+```{list-table}
+:header-rows: 1
+* - Action properties
+* - {term}`Action`
+  - Entities: List all disabled entities 👻
+* - {term}`Action name`
+  - `homeassistant.list_disabled_entities`
+* - {term}`Action targets`
+  - No targets
+* - {term}`Action response`
+  - Response with `count` and `entities`
+* - {term}`Spook's influence <influence of spook>`
+  - Newly added action.
+* - {term}`Developer tools`
+  - [Try this action](https://my.home-assistant.io/redirect/developer_call_service/?service=homeassistant.list_disabled_entities)
+    [![Open your Home Assistant instance and show your actions developer tools with a specific action selected.](https://my.home-assistant.io/badges/developer_call_service.svg)](https://my.home-assistant.io/redirect/developer_call_service/?service=homeassistant.list_disabled_entities)
+```
+
+```{figure} ./images/entities/list_disabled_entities.png
+:name: List all disabled entities in Developer Tools
+:alt: Screenshot showing Developer Tools calling the "homeassistant.list_disabled_entities" action with “Return response” enabled and the response payload with count and entities.
+:align: center
+
+Calling the action in Developer Tools with “Return response” enabled.
+```
+
+:::{seealso} Example {term}`action <performing actions>` in {term}`YAML`
+:class: dropdown
+
+```{code-block} yaml
+:linenos:
+action: homeassistant.list_disabled_entities
+# When running from Developer Tools, enable "Return response".
+# In automations/scripts, capture the response using "response_variable".
+response_variable: disabled_out
+```
+
+:::
+
+:::{seealso} Example action response
+:class: dropdown
+
+```{code-block} yaml
+:linenos:
+count: 5
+entities:
+  - binary_sensor.hall_motion
+  - cover.garage_door
+  - light.garden_string
+  - sensor.pool_ph
+  - switch.boiler_circulation
+```
+
+:::
+
 ### Hide an entity
 
 This action allows you to hide an entity on the fly.
@@ -262,6 +321,68 @@ data:
   entity_id:
     - light.living_room
     - light.kitchen_ceiling
+```
+
+:::
+
+## List all hidden entities
+
+Lists all entities that are currently hidden in the entity registry.
+
+```{figure} ./images/entities/list_disabled_entities.png
+:alt: Screenshot of the Home Assistant list disabled entities action in the developer tools.
+:align: center
+```
+
+```{list-table}
+:header-rows: 1
+* - Action properties
+* - {term}`Action`
+  - Entities: List all hidden entities 👻
+* - {term}`Action name`
+  - `homeassistant.list_hidden_entities`
+* - {term}`Action targets`
+  - No targets
+* - {term}`Action response`
+  - Response with `count` and `entities`
+* - {term}`Spook's influence <influence of spook>`
+  - Newly added action.
+* - {term}`Developer tools`
+  - [Try this action](https://my.home-assistant.io/redirect/developer_call_service/?service=homeassistant.list_hidden_entities)
+    [![Open your Home Assistant instance and show your actions developer tools with a specific action selected.](https://my.home-assistant.io/badges/developer_call_service.svg)](https://my.home-assistant.io/redirect/developer_call_service/?service=homeassistant.list_hidden_entities)
+```
+
+```{figure} ./images/entities/list_hidden_entities.png
+:name: List all hidden entities in Developer Tools
+:alt: Screenshot showing Developer Tools calling the "homeassistant.list_hidden_entities" action with “Return response” enabled and the response payload with count and entities.
+:align: center
+
+Calling the action in Developer Tools with “Return response” enabled.
+```
+
+:::{seealso} Example {term}`action <performing actions>` in {term}`YAML`
+:class: dropdown
+
+```{code-block} yaml
+:linenos:
+action: homeassistant.list_hidden_entities
+# When running from Developer Tools, enable "Return response".
+# In automations/scripts, capture the response using "response_variable".
+response_variable: hidden_out
+```
+
+:::
+
+:::{seealso} Example action response
+:class: dropdown
+
+```{code-block} yaml
+:linenos:
+count: 3
+entities:
+  - light.living_room_lamp
+  - sensor.attic_temperature
+  - switch.guest_mode
 ```
 
 :::
