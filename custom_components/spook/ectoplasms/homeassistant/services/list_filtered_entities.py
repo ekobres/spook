@@ -153,11 +153,6 @@ class ListFilteredEntities(AbstractSpookService):
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.homeassistant import DOMAIN
-from homeassistant.const import (
-    EVENT_AREA_REGISTRY_UPDATED,
-    EVENT_DEVICE_REGISTRY_UPDATED,
-    EVENT_ENTITY_REGISTRY_UPDATED,
-)
 from homeassistant.core import Event, ServiceResponse, SupportsResponse, callback
 from homeassistant.helpers import (
     area_registry as ar,
@@ -172,13 +167,10 @@ from ....services import AbstractSpookService
 if TYPE_CHECKING:
     from homeassistant.core import ServiceCall
 
-# Event for label registry updates (Home Assistant 2024.12+)
-EVENT_LABEL_REGISTRY_UPDATED = "label_registry_updated"
-
 # Status filter options
 STATUS_OPTIONS = [
     "available",
-    "unavailable", 
+    "unavailable",
     "enabled",
     "disabled",
     "visible",
@@ -190,7 +182,7 @@ STATUS_OPTIONS = [
 # Values/columns options
 VALUES_OPTIONS = [
     "name",
-    "device", 
+    "device",
     "area",
     "integration",
     "status",
@@ -227,22 +219,22 @@ class SpookService(AbstractSpookService):
             return
 
         self.hass.bus.async_listen(
-            EVENT_AREA_REGISTRY_UPDATED,
+            ar.EVENT_AREA_REGISTRY_UPDATED,
             self._handle_registry_updated,
         )
         self.hass.bus.async_listen(
-            EVENT_DEVICE_REGISTRY_UPDATED, 
+            dr.EVENT_DEVICE_REGISTRY_UPDATED,
             self._handle_registry_updated,
         )
         self.hass.bus.async_listen(
-            EVENT_ENTITY_REGISTRY_UPDATED,
+            er.EVENT_ENTITY_REGISTRY_UPDATED,
             self._handle_registry_updated,
         )
         
         # Feature detect label registry support
         if hasattr(lr, "async_get"):
             self.hass.bus.async_listen(
-                EVENT_LABEL_REGISTRY_UPDATED,
+                lr.EVENT_LABEL_REGISTRY_UPDATED,
                 self._handle_registry_updated,
             )
         
