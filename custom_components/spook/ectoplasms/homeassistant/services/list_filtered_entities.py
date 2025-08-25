@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-import voluptuous as vol
 from homeassistant.components.homeassistant import DOMAIN
 from homeassistant.core import Event, ServiceResponse, SupportsResponse, callback
 from homeassistant.helpers import (
@@ -14,7 +13,6 @@ from homeassistant.helpers import (
     entity_registry as er,
     label_registry as lr,
 )
-from homeassistant.helpers.selector import selector
 
 from ....const import LOGGER
 from ....services import AbstractSpookService
@@ -73,28 +71,6 @@ class SpookService(AbstractSpookService):
         """Initialize the service."""
         super().__init__(*args, **kwargs)
         self._listeners_setup = False
-
-    @property
-    def schema(self) -> dict[str, Any] | None:
-        """Return the schema for this service with dynamic field generation."""
-        LOGGER.debug("Schema property accessed for list_filtered_entities service")
-        try:
-            # Get our dynamic fields
-            fields = self.fields
-            LOGGER.debug("Converting %d fields to voluptuous schema", len(fields))
-            
-            # Convert selector-based fields to voluptuous schema
-            schema_dict = {}
-            for field_name, field_config in fields.items():
-                # All fields are optional for this service
-                schema_dict[vol.Optional(field_name)] = selector(field_config["selector"])
-                
-        except (AttributeError, ImportError, KeyError) as e:
-            LOGGER.error("Error building dynamic schema: %s", e)
-            return None
-        else:
-            LOGGER.debug("Successfully built dynamic schema with %d fields", len(schema_dict))
-            return schema_dict
 
     def _setup_event_listeners(self) -> None:
         """Set up event listeners for registry updates."""
