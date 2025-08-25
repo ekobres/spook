@@ -1248,31 +1248,176 @@ homeassistant_list_filtered_entities:
       description: >-
         Search term to filter entities. Searches across entity ID, domain, integration,
         display names, device names, area names, integration names, and label names.
+      required: false
+      selector:
+        text:
     areas:
       name: Areas
       description: Filter by specific areas (OR logic within this filter).
+      required: false
+      selector:
+        area:
+          multiple: true
     devices:
       name: Devices
       description: Filter by specific devices (OR logic within this filter).
+      required: false
+      selector:
+        device:
+          multiple: true
     domains:
       name: Domains
       description: Filter by specific entity domains (OR logic within this filter).
+      required: false
+      selector:
+        select:
+          multiple: true
+          custom_value: true
+          mode: dropdown
+          options:
+            - value: light
+              label: Light
+            - value: switch
+              label: Switch
+            - value: sensor
+              label: Sensor
+            - value: binary_sensor
+              label: Binary Sensor
+            - value: climate
+              label: Climate
+            - value: cover
+              label: Cover
+            - value: fan
+              label: Fan
+            - value: lock
+              label: Lock
+            - value: media_player
+              label: Media Player
+            - value: camera
+              label: Camera
+            - value: alarm_control_panel
+              label: Alarm Control Panel
+            - value: automation
+              label: Automation
+            - value: script
+              label: Script
+            - value: scene
+              label: Scene
+            - value: input_boolean
+              label: Input Boolean
+            - value: input_number
+              label: Input Number
+            - value: input_select
+              label: Input Select
+            - value: input_text
+              label: Input Text
+            - value: input_datetime
+              label: Input Datetime
     integrations:
       name: Integrations
       description: Filter by specific integrations (OR logic within this filter).
+      required: false
+      selector:
+        select:
+          multiple: true
+          custom_value: true
+          mode: dropdown
+          options:
+            - value: mqtt
+              label: MQTT
+            - value: zwave_js
+              label: Z-Wave JS
+            - value: zigbee2mqtt
+              label: Zigbee2MQTT
+            - value: zha
+              label: ZHA (Zigbee)
+            - value: esphome
+              label: ESPHome
+            - value: tasmota
+              label: Tasmota
+            - value: hue
+              label: Philips Hue
+            - value: homekit_controller
+              label: HomeKit
+            - value: cast
+              label: Google Cast
+            - value: spotify
+              label: Spotify
+            - value: weather
+              label: Weather
+            - value: sun
+              label: Sun
+            - value: moon
+              label: Moon
     status:
       name: Status
       description: Filter by entity status (OR logic within this filter).
+      required: false
+      selector:
+        select:
+          multiple: true
+          mode: dropdown
+          options:
+            - value: available
+              label: Available
+            - value: unavailable
+              label: Unavailable
+            - value: enabled
+              label: Enabled
+            - value: disabled
+              label: Disabled
+            - value: visible
+              label: Visible
+            - value: hidden
+              label: Hidden
+            - value: unmanageable
+              label: Unmanageable
+            - value: not_provided
+              label: Not Provided
     label_id:
       name: Labels
       description: Filter by specific labels (OR logic within this filter).
+      required: false
+      selector:
+        label:
+          multiple: true
     values:
       name: Values
       description: >-
         Additional entity information to include in the response.
         If none selected, returns only entity IDs for minimal response.
+      required: false
+      selector:
+        select:
+          multiple: true
+          mode: dropdown
+          options:
+            - value: name
+              label: Name
+            - value: device
+              label: Device
+            - value: area
+              label: Area
+            - value: integration
+              label: Integration
+            - value: status
+              label: Status
+            - value: icon
+              label: Icon
+            - value: created
+              label: Created
+            - value: modified
+              label: Modified
+            - value: labels
+              label: Labels
     limit:
       name: Limit
       description: >-
         Maximum number of entities to return. Defaults to 50,000 if not specified.
         Maximum allowed is 50,000 for safety.
+      required: false
+      default: 50000
+      selector:
+        number:
+          min: 1
+          max: 50000
