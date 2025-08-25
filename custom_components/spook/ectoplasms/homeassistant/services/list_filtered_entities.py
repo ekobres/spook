@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+import voluptuous as vol
 from homeassistant.components.homeassistant import DOMAIN
 from homeassistant.core import Event, ServiceResponse, SupportsResponse, callback
 from homeassistant.helpers import (
@@ -13,6 +14,7 @@ from homeassistant.helpers import (
     entity_registry as er,
     label_registry as lr,
 )
+from homeassistant.helpers.selector import selector
 
 from ....const import LOGGER
 from ....services import AbstractSpookService
@@ -71,6 +73,28 @@ class SpookService(AbstractSpookService):
         """Initialize the service."""
         super().__init__(*args, **kwargs)
         self._listeners_setup = False
+
+    @property
+    def schema(self) -> dict[str, Any] | None:
+        """Return the schema for this service with dynamic field generation."""
+        LOGGER.debug("Schema property accessed for list_filtered_entities service")
+        try:
+            # Get our dynamic fields
+            fields = self.fields
+            LOGGER.debug("Converting %d fields to voluptuous schema", len(fields))
+            
+            # Convert selector-based fields to voluptuous schema
+            schema_dict = {}
+            for field_name, field_config in fields.items():
+                # All fields are optional for this service
+                schema_dict[vol.Optional(field_name)] = selector(field_config["selector"])
+                
+        except (AttributeError, ImportError, KeyError) as e:
+            LOGGER.error("Error building dynamic schema: %s", e)
+            return None
+        else:
+            LOGGER.debug("Successfully built dynamic schema with %d fields", len(schema_dict))
+            return schema_dict
 
     def _setup_event_listeners(self) -> None:
         """Set up event listeners for registry updates."""
@@ -171,15 +195,12 @@ class SpookService(AbstractSpookService):
 
     @property
     def fields(self) -> dict[str, Any]:
-        """Return the fields for this service."""
+        """Return the fields for this service with dynamic options populated."""
         LOGGER.debug("Fields property accessed for list_filtered_entities service")
         self._setup_event_listeners()
 
-        domains_options = self._get_domains_options()
-        integrations_options = self._get_integrations_options()
-        LOGGER.debug("Built field options: domains=%d, integrations=%d", len(domains_options), len(integrations_options))
-
-        return {
+        # Start with base field definitions (which match our YAML structure)
+        fields = {
             "search": {
                 "selector": {"text": {}},
             },
@@ -194,7 +215,8 @@ class SpookService(AbstractSpookService):
                     "select": {
                         "multiple": True,
                         "custom_value": True,
-                        "options": domains_options,
+                        "mode": "dropdown",
+                        "options": [],  # Will be populated dynamically below
                     }
                 }
             },
@@ -203,7 +225,8 @@ class SpookService(AbstractSpookService):
                     "select": {
                         "multiple": True,
                         "custom_value": True,
-                        "options": integrations_options,
+                        "mode": "dropdown",
+                        "options": [],  # Will be populated dynamically below
                     }
                 }
             },
@@ -211,6 +234,7 @@ class SpookService(AbstractSpookService):
                 "selector": {
                     "select": {
                         "multiple": True,
+                        "mode": "dropdown",
                         "options": [
                             {"value": status, "label": status.replace("_", " ").title()}
                             for status in STATUS_OPTIONS
@@ -218,13 +242,15 @@ class SpookService(AbstractSpookService):
                     }
                 }
             },
-            "labels": {
+            "label_id": {
                 "selector": {"label": {"multiple": True}},
             },
             "values": {
                 "selector": {
                     "select": {
                         "multiple": True,
+                        "mode": "dropdown",
+                        "label": "Select information to include",
                         "options": [
                             {"value": value, "label": value.replace("_", " ").title()}
                             for value in VALUES_OPTIONS
@@ -237,6 +263,17 @@ class SpookService(AbstractSpookService):
                 "selector": {"number": {"min": 1, "max": 50000}},
             },
         }
+
+        # Populate dynamic options
+        domains_options = self._get_domains_options()
+        integrations_options = self._get_integrations_options()
+        
+        fields["domains"]["selector"]["select"]["options"] = domains_options
+        fields["integrations"]["selector"]["select"]["options"] = integrations_options
+        
+        LOGGER.debug("Built field options: domains=%d, integrations=%d", len(domains_options), len(integrations_options))
+
+        return fields
 
     def _matches_search(
         self,
