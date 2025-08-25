@@ -1272,6 +1272,9 @@ homeassistant_list_filtered_entities:
       selector:
         select:
           multiple: true
+          custom_value: true
+          mode: dropdown
+          label: Select domains
           options: []  # Populated dynamically by Python code
     integrations:
       name: Integrations
@@ -1280,6 +1283,9 @@ homeassistant_list_filtered_entities:
       selector:
         select:
           multiple: true
+          custom_value: true
+          mode: dropdown
+          label: Select integrations
           options: []  # Populated dynamically by Python code
     status:
       name: Status
@@ -1288,6 +1294,8 @@ homeassistant_list_filtered_entities:
       selector:
         select:
           multiple: true
+          mode: dropdown
+          label: Select status
           options:
             - value: available
               label: Available
@@ -1310,9 +1318,8 @@ homeassistant_list_filtered_entities:
       description: Filter by specific labels (OR logic within this filter).
       required: false
       selector:
-        select:
+        label:
           multiple: true
-          options: []  # Populated dynamically by Python code
     values:
       name: Values
       description: >-
@@ -1322,6 +1329,8 @@ homeassistant_list_filtered_entities:
       selector:
         select:
           multiple: true
+          mode: dropdown
+          label: Select information to include
           options:
             - value: name
               label: Name

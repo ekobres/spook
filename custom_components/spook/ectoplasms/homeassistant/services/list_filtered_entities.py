@@ -9,7 +9,6 @@ from homeassistant.components.homeassistant import DOMAIN
 from homeassistant.core import Event, ServiceResponse, SupportsResponse, callback
 from homeassistant.helpers import (
     area_registry as ar,
-    config_validation as cv,
     device_registry as dr,
     entity_registry as er,
     label_registry as lr,
@@ -70,11 +69,6 @@ class SpookService(AbstractSpookService):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the service."""
         super().__init__(*args, **kwargs)
-        self._areas_cache: dict[str, str] | None = None
-        self._devices_cache: dict[str, str] | None = None
-        self._integrations_cache: dict[str, str] | None = None
-        self._domains_cache: list[str] | None = None
-        self._labels_cache: dict[str, str] | None = None
         self._listeners_setup = False
 
     def _setup_event_listeners(self) -> None:
@@ -106,99 +100,61 @@ class SpookService(AbstractSpookService):
 
     @callback
     def _handle_registry_updated(self, _event: Event) -> None:
-        """Handle registry update events by invalidating caches."""
-        self._areas_cache = None
-        self._devices_cache = None
-        self._integrations_cache = None
-        self._domains_cache = None
-        self._labels_cache = None
+        """Handle registry update events."""
+        # No caching in this implementation, so nothing to invalidate
 
-    def _get_areas_options(self) -> list[dict[str, str]]:
-        """Get areas selector options."""
-        if self._areas_cache is None:
-            area_registry = ar.async_get(self.hass)
-            self._areas_cache = {
-                area.id: area.name
-                for area in area_registry.areas.values()
-            }
-
+    def _get_domains_options(self) -> list[dict[str, str]]:
+        """Get domains selector options with safe registry access."""
+        try:
+            if hasattr(er, "async_get") and self.hass is not None:
+                entity_registry = er.async_get(self.hass)
+                if entity_registry and hasattr(entity_registry, "entities"):
+                    domains = set()
+                    for entry in entity_registry.entities.values():
+                        domain = entry.entity_id.split(".", 1)[0]
+                        domains.add(domain)
+                    
+                    return [
+                        {"value": domain, "label": domain.replace("_", " ").title()}
+                        for domain in sorted(domains)
+                    ]
+        except (AttributeError, RuntimeError, KeyError):
+            # Registry not ready or not available
+            pass
+        
+        # Fallback to common domains if registry not available
         return [
-            {"value": area_id, "label": name}
-            for area_id, name in sorted(self._areas_cache.items(), key=lambda x: x[1])
-        ]
-
-    def _get_devices_options(self) -> list[dict[str, str]]:
-        """Get devices selector options."""
-        if self._devices_cache is None:
-            device_registry = dr.async_get(self.hass)
-            self._devices_cache = {}
-            for device in device_registry.devices.values():
-                name = device.name_by_user or device.name
-                if name:
-                    self._devices_cache[device.id] = name
-
-        return [
-            {"value": device_id, "label": name}
-            for device_id, name in sorted(self._devices_cache.items(), key=lambda x: x[1])
+            {"value": "light", "label": "Light"},
+            {"value": "switch", "label": "Switch"},
+            {"value": "sensor", "label": "Sensor"},
+            {"value": "binary_sensor", "label": "Binary Sensor"},
+            {"value": "climate", "label": "Climate"},
+            {"value": "cover", "label": "Cover"},
+            {"value": "fan", "label": "Fan"},
+            {"value": "lock", "label": "Lock"},
+            {"value": "media_player", "label": "Media Player"},
+            {"value": "vacuum", "label": "Vacuum"},
         ]
 
     def _get_integrations_options(self) -> list[dict[str, str]]:
-        """Get integrations selector options."""
-        if self._integrations_cache is None:
-            entity_registry = er.async_get(self.hass)
-            integrations: set[str] = set()
-
-            for entry in entity_registry.entities.values():
-                if entry.platform:
-                    integrations.add(entry.platform)
-
-            self._integrations_cache = {
-                integration: integration.replace("_", " ").title()
-                for integration in integrations
-            }
-
-        return [
-            {"value": integration, "label": name}
-            for integration, name in sorted(self._integrations_cache.items(), key=lambda x: x[1])
-        ]
-
-    def _get_domains_options(self) -> list[dict[str, str]]:
-        """Get domains selector options."""
-        if self._domains_cache is None:
-            entity_registry = er.async_get(self.hass)
-            domains: set[str] = set()
-
-            for entry in entity_registry.entities.values():
-                domain = entry.entity_id.split(".", 1)[0]
-                domains.add(domain)
-
-            self._domains_cache = sorted(domains)
-
-        return [
-            {"value": domain, "label": domain.replace("_", " ").title()}
-            for domain in self._domains_cache
-        ]
-
-    def _get_labels_options(self) -> list[dict[str, str]]:
-        """Get labels selector options."""
-        if not hasattr(lr, "async_get"):
-            return []
-
-        if self._labels_cache is None:
-            try:
-                label_registry = lr.async_get(self.hass)
-                self._labels_cache = {
-                    label.label_id: label.name
-                    for label in label_registry.labels.values()
-                }
-            except AttributeError:
-                # Labels not supported in this HA version
-                return []
-
-        return [
-            {"value": label_id, "label": name}
-            for label_id, name in sorted(self._labels_cache.items(), key=lambda x: x[1])
-        ]
+        """Get integrations selector options with safe registry access."""
+        try:
+            if hasattr(er, "async_get") and self.hass is not None:
+                entity_registry = er.async_get(self.hass)
+                if entity_registry and hasattr(entity_registry, "entities"):
+                    integrations = set()
+                    for entry in entity_registry.entities.values():
+                        if entry.platform:
+                            integrations.add(entry.platform)
+                    
+                    return [
+                        {"value": integration, "label": integration.replace("_", " ").title()}
+                        for integration in sorted(integrations)
+                    ]
+        except (AttributeError, RuntimeError, KeyError):
+            # Registry not ready or not available
+            pass
+        return []
 
     @property
     def fields(self) -> dict[str, Any]:
@@ -206,27 +162,20 @@ class SpookService(AbstractSpookService):
         self._setup_event_listeners()
 
         return {
-            "search": cv.string,
+            "search": {
+                "selector": {"text": {}},
+            },
             "areas": {
-                "selector": {
-                    "select": {
-                        "multiple": True,
-                        "options": self._get_areas_options(),
-                    }
-                }
+                "selector": {"area": {"multiple": True}},
             },
             "devices": {
-                "selector": {
-                    "select": {
-                        "multiple": True,
-                        "options": self._get_devices_options(),
-                    }
-                }
+                "selector": {"device": {"multiple": True}},
             },
             "domains": {
                 "selector": {
                     "select": {
                         "multiple": True,
+                        "custom_value": True,
                         "options": self._get_domains_options(),
                     }
                 }
@@ -235,6 +184,7 @@ class SpookService(AbstractSpookService):
                 "selector": {
                     "select": {
                         "multiple": True,
+                        "custom_value": True,
                         "options": self._get_integrations_options(),
                     }
                 }
@@ -251,12 +201,7 @@ class SpookService(AbstractSpookService):
                 }
             },
             "labels": {
-                "selector": {
-                    "select": {
-                        "multiple": True,
-                        "options": self._get_labels_options(),
-                    }
-                }
+                "selector": {"label": {"multiple": True}},
             },
             "values": {
                 "selector": {
@@ -269,7 +214,10 @@ class SpookService(AbstractSpookService):
                     }
                 }
             },
-            "limit": cv.positive_int,
+            "limit": {
+                "default": 50000,
+                "selector": {"number": {"min": 1, "max": 50000}},
+            },
         }
 
     def _matches_search(
