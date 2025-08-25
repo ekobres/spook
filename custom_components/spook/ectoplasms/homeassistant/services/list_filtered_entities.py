@@ -14,6 +14,7 @@ from homeassistant.helpers import (
     label_registry as lr,
 )
 
+from ....const import LOGGER
 from ....services import AbstractSpookService
 
 if TYPE_CHECKING:
@@ -105,25 +106,29 @@ class SpookService(AbstractSpookService):
 
     def _get_domains_options(self) -> list[dict[str, str]]:
         """Get domains selector options with safe registry access."""
+        LOGGER.debug("Getting domains options - hass available: %s", self.hass is not None)
         try:
             if hasattr(er, "async_get") and self.hass is not None:
                 entity_registry = er.async_get(self.hass)
+                LOGGER.debug("Entity registry obtained: %s", entity_registry is not None)
                 if entity_registry and hasattr(entity_registry, "entities"):
                     domains = set()
                     for entry in entity_registry.entities.values():
                         domain = entry.entity_id.split(".", 1)[0]
                         domains.add(domain)
                     
-                    return [
+                    options = [
                         {"value": domain, "label": domain.replace("_", " ").title()}
                         for domain in sorted(domains)
                     ]
-        except (AttributeError, RuntimeError, KeyError):
+                    LOGGER.debug("Generated %d domain options: %s", len(options), [opt["value"] for opt in options[:5]])
+                    return options
+        except (AttributeError, RuntimeError, KeyError) as e:
             # Registry not ready or not available
-            pass
+            LOGGER.debug("Exception getting domains options: %s", e)
         
         # Fallback to common domains if registry not available
-        return [
+        fallback_options = [
             {"value": "light", "label": "Light"},
             {"value": "switch", "label": "Switch"},
             {"value": "sensor", "label": "Sensor"},
@@ -135,31 +140,44 @@ class SpookService(AbstractSpookService):
             {"value": "media_player", "label": "Media Player"},
             {"value": "vacuum", "label": "Vacuum"},
         ]
+        LOGGER.debug("Using fallback domains options: %d items", len(fallback_options))
+        return fallback_options
 
     def _get_integrations_options(self) -> list[dict[str, str]]:
         """Get integrations selector options with safe registry access."""
+        LOGGER.debug("Getting integrations options - hass available: %s", self.hass is not None)
         try:
             if hasattr(er, "async_get") and self.hass is not None:
                 entity_registry = er.async_get(self.hass)
+                LOGGER.debug("Entity registry obtained for integrations: %s", entity_registry is not None)
                 if entity_registry and hasattr(entity_registry, "entities"):
                     integrations = set()
                     for entry in entity_registry.entities.values():
                         if entry.platform:
                             integrations.add(entry.platform)
                     
-                    return [
+                    options = [
                         {"value": integration, "label": integration.replace("_", " ").title()}
                         for integration in sorted(integrations)
                     ]
-        except (AttributeError, RuntimeError, KeyError):
+                    LOGGER.debug("Generated %d integration options: %s", len(options), [opt["value"] for opt in options[:5]])
+                    return options
+        except (AttributeError, RuntimeError, KeyError) as e:
             # Registry not ready or not available
-            pass
+            LOGGER.debug("Exception getting integrations options: %s", e)
+        
+        LOGGER.debug("Using empty integrations options")
         return []
 
     @property
     def fields(self) -> dict[str, Any]:
         """Return the fields for this service."""
+        LOGGER.debug("Fields property accessed for list_filtered_entities service")
         self._setup_event_listeners()
+
+        domains_options = self._get_domains_options()
+        integrations_options = self._get_integrations_options()
+        LOGGER.debug("Built field options: domains=%d, integrations=%d", len(domains_options), len(integrations_options))
 
         return {
             "search": {
@@ -176,7 +194,7 @@ class SpookService(AbstractSpookService):
                     "select": {
                         "multiple": True,
                         "custom_value": True,
-                        "options": self._get_domains_options(),
+                        "options": domains_options,
                     }
                 }
             },
@@ -185,7 +203,7 @@ class SpookService(AbstractSpookService):
                     "select": {
                         "multiple": True,
                         "custom_value": True,
-                        "options": self._get_integrations_options(),
+                        "options": integrations_options,
                     }
                 }
             },
