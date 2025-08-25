@@ -1313,7 +1313,7 @@ homeassistant_list_filtered_entities:
               label: Unmanageable
             - value: not_provided
               label: Not Provided
-    labels:
+    label_id:
       name: Labels
       description: Filter by specific labels (OR logic within this filter).
       required: false

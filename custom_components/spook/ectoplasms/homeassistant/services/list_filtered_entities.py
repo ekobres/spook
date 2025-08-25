@@ -455,7 +455,7 @@ class SpookService(AbstractSpookService):
         domains = call.data.get("domains", [])
         integrations = call.data.get("integrations", [])
         status = call.data.get("status", [])
-        labels = call.data.get("labels", [])
+        label_id = call.data.get("label_id", [])
         values = call.data.get("values", [])
         limit = call.data.get("limit")
 
@@ -470,7 +470,7 @@ class SpookService(AbstractSpookService):
             "domains": domains,
             "integrations": integrations,
             "status": status,
-            "labels": labels,
+            "labels": label_id,
         }
 
         return filters, values, limit
