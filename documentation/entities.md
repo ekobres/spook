@@ -137,65 +137,6 @@ data:
 
 :::
 
-## List all disabled entities
-
-Lists all entities that are currently disabled in the entity registry.
-
-```{list-table}
-:header-rows: 1
-* - Action properties
-* - {term}`Action`
-  - Entities: List all disabled entities 👻
-* - {term}`Action name`
-  - `homeassistant.list_disabled_entities`
-* - {term}`Action targets`
-  - No targets
-* - {term}`Action response`
-  - Response with `count` and `entities`
-* - {term}`Spook's influence <influence of spook>`
-  - Newly added action.
-* - {term}`Developer tools`
-  - [Try this action](https://my.home-assistant.io/redirect/developer_call_service/?service=homeassistant.list_disabled_entities)
-    [![Open your Home Assistant instance and show your actions developer tools with a specific action selected.](https://my.home-assistant.io/badges/developer_call_service.svg)](https://my.home-assistant.io/redirect/developer_call_service/?service=homeassistant.list_disabled_entities)
-```
-
-```{figure} ./images/entities/list_disabled_entities.png
-:name: List all disabled entities in Developer Tools
-:alt: Screenshot showing Developer Tools calling the "homeassistant.list_disabled_entities" action with “Return response” enabled and the response payload with count and entities.
-:align: center
-
-Calling the action in Developer Tools with “Return response” enabled.
-```
-
-:::{seealso} Example {term}`action <performing actions>` in {term}`YAML`
-:class: dropdown
-
-```{code-block} yaml
-:linenos:
-action: homeassistant.list_disabled_entities
-# When running from Developer Tools, enable "Return response".
-# In automations/scripts, capture the response using "response_variable".
-response_variable: disabled_out
-```
-
-:::
-
-:::{seealso} Example action response
-:class: dropdown
-
-```{code-block} yaml
-:linenos:
-count: 5
-entities:
-  - binary_sensor.hall_motion
-  - cover.garage_door
-  - light.garden_string
-  - sensor.pool_ph
-  - switch.boiler_circulation
-```
-
-:::
-
 ### Hide an entity
 
 This action allows you to hide an entity on the fly.
@@ -325,12 +266,14 @@ data:
 
 :::
 
-## List all hidden entities
+### List filtered entities
 
-Lists all entities that are currently hidden in the entity registry.
+This action allows you to list entities with advanced filtering options, replicating the Home Assistant entities UI filtering capabilities. This is perfect for inspection workflows, scripts, and automations that need to query entities dynamically based on various criteria.
 
-```{figure} ./images/entities/list_disabled_entities.png
-:alt: Screenshot of the Home Assistant list disabled entities action in the developer tools.
+The action supports comprehensive filtering by search terms, areas, devices, domains, integrations, status, and labels. It can return either simple entity ID lists or detailed entity information including names, devices, areas, integrations, status, icons, timestamps, and labels.
+
+```{figure} ./images/entities/list_filtered_entities.png
+:alt: Screenshot of the Home Assistant list filtered entities action in the developer tools.
 :align: center
 ```
 
@@ -338,51 +281,152 @@ Lists all entities that are currently hidden in the entity registry.
 :header-rows: 1
 * - Action properties
 * - {term}`Action`
-  - Entities: List all hidden entities 👻
+  - List filtered entities 👻
 * - {term}`Action name`
-  - `homeassistant.list_hidden_entities`
+  - `homeassistant.list_filtered_entities`
 * - {term}`Action targets`
-  - No targets
+  - No
 * - {term}`Action response`
-  - Response with `count` and `entities`
+  - Yes
 * - {term}`Spook's influence <influence of spook>`
   - Newly added action.
 * - {term}`Developer tools`
-  - [Try this action](https://my.home-assistant.io/redirect/developer_call_service/?service=homeassistant.list_hidden_entities)
-    [![Open your Home Assistant instance and show your actions developer tools with a specific action selected.](https://my.home-assistant.io/badges/developer_call_service.svg)](https://my.home-assistant.io/redirect/developer_call_service/?service=homeassistant.list_hidden_entities)
+  - [Try this action](https://my.home-assistant.io/redirect/developer_call_service/?service=homeassistant.list_filtered_entities)
+    [![Open your Home Assistant instance and show your actions developer tools with a specific action selected.](https://my.home-assistant.io/badges/developer_call_service.svg)](https://my.home-assistant.io/redirect/developer_call_service/?service=homeassistant.list_filtered_entities)
 ```
 
-```{figure} ./images/entities/list_hidden_entities.png
-:name: List all hidden entities in Developer Tools
-:alt: Screenshot showing Developer Tools calling the "homeassistant.list_hidden_entities" action with “Return response” enabled and the response payload with count and entities.
-:align: center
-
-Calling the action in Developer Tools with “Return response” enabled.
+```{list-table}
+:header-rows: 2
+* - Action data parameters
+* - Attribute
+  - Type
+  - Required
+  - Default / Example
+* - `search`
+  - {term}`string <string>`
+  - No
+  - `"living room"`
+* - `areas`
+  - {term}`string <string>` | {term}`list of strings <list>`
+  - No
+  - `["living_room", "kitchen"]`
+* - `devices`
+  - {term}`string <string>` | {term}`list of strings <list>`
+  - No
+  - `["abc123def456", "ghi789jkl012"]`
+* - `domains`
+  - {term}`string <string>` | {term}`list of strings <list>`
+  - No
+  - `["light", "switch", "sensor"]`
+* - `integrations`
+  - {term}`string <string>` | {term}`list of strings <list>`
+  - No
+  - `["hue", "zwave_js", "mqtt"]`
+* - `status`
+  - {term}`string <string>` | {term}`list of strings <list>`
+  - No
+  - `["enabled", "available"]`
+* - `labels`
+  - {term}`string <string>` | {term}`list of strings <list>`
+  - No
+  - `["bedroom_lights", "security"]`
+* - `values`
+  - {term}`string <string>` | {term}`list of strings <list>`
+  - No
+  - `["name", "area", "device", "status"]`
+* - `limit`
+  - {term}`integer <integer>`
+  - No
+  - `500`
 ```
+
+The `search` parameter searches across entity IDs, domains, integration names, display names, device names, area names, and label names. It supports both exact matches and regular expressions when the search term is enclosed in forward slashes (e.g., `/^light\./`).
+
+The `status` parameter accepts the following values:
+- `available`: Entity is available (not unavailable/unknown)
+- `unavailable`: Entity state is unavailable
+- `enabled`: Entity is enabled in the registry
+- `disabled`: Entity is disabled in the registry
+- `visible`: Entity is visible (not hidden)
+- `hidden`: Entity is hidden from UI
+- `unmanageable`: Entity cannot be managed (no registry entry)
+- `not_provided`: Entity exists but is not provided by any integration
+
+The `values` parameter controls what information is included in the response:
+- `name`: Entity's display name
+- `device`: Device name and ID (if applicable)
+- `area`: Area name and ID (if applicable) 
+- `integration`: Integration name and domain
+- `status`: Current status (enabled/disabled, visible/hidden, available/unavailable)
+- `icon`: Entity's icon
+- `created`: Entity creation timestamp
+- `modified`: Entity last modified timestamp
+- `labels`: Associated label names and IDs
+
+When no `values` are specified, the action returns a simple list of entity IDs for minimal response size.
+
+All filters use OR logic within each filter type (e.g., multiple areas) and AND logic across different filter types. The action includes safety limits with a default maximum of 500 results and supports up to 50,000 results when explicitly specified.
 
 :::{seealso} Example {term}`action <performing actions>` in {term}`YAML`
 :class: dropdown
 
+Simple entity ID list:
+
 ```{code-block} yaml
 :linenos:
-action: homeassistant.list_hidden_entities
-# When running from Developer Tools, enable "Return response".
-# In automations/scripts, capture the response using "response_variable".
-response_variable: hidden_out
+action: homeassistant.list_filtered_entities
+data:
+  domains: 
+    - light
+    - switch
+  areas: living_room
 ```
 
-:::
-
-:::{seealso} Example action response
-:class: dropdown
+Detailed information for entities matching search criteria:
 
 ```{code-block} yaml
 :linenos:
-count: 3
-entities:
-  - light.living_room_lamp
-  - sensor.attic_temperature
-  - switch.guest_mode
+action: homeassistant.list_filtered_entities
+data:
+  search: "living room"
+  status: 
+    - enabled
+    - available
+  values:
+    - name
+    - area
+    - device
+    - status
+  limit: 100
+```
+
+Find all unavailable Zigbee devices:
+
+```{code-block} yaml
+:linenos:
+action: homeassistant.list_filtered_entities
+data:
+  integrations: zha
+  status: unavailable
+  values:
+    - name
+    - device
+    - status
+```
+
+List entities with specific labels:
+
+```{code-block} yaml
+:linenos:
+action: homeassistant.list_filtered_entities
+data:
+  labels:
+    - security
+    - automation_controlled
+  values:
+    - name
+    - labels
+    - area
 ```
 
 :::

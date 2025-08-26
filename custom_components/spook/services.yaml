@@ -722,16 +722,6 @@ homeassistant_delete_all_orphaned_entities:
     integration is offline or not working since Home Assistant started. Calling
     this action will delete those entities as well.
 
-homeassistant_list_disabled_entities:
-  name: List all disabled entities 👻
-  description: >-
-    Lists all entities that are marked as disabled in the entity registry.
-
-homeassistant_list_hidden_entities:
-  name: List all hidden entities 👻
-  description: >-
-    Lists all entities that are marked as hidden in the entity registry.
-
 homeassistant_list_orphaned_database_entities:
   name: List all orphaned database entities 👻
   description: >-
@@ -1246,3 +1236,234 @@ zone_delete:
           multiple: true
           filter:
             - domain: zone
+
+homeassistant_list_filtered_entities:
+  name: List filtered entities 👻
+  description: >-
+    Lists entities with advanced filtering options, replicating the Home Assistant entities UI filtering capabilities.
+    Perfect for inspection workflows, scripts, and automations that need to query entities dynamically.
+  fields:
+    search:
+      name: Search
+      description: >-
+        Search term to filter entities. Searches across entity ID, domain, integration,
+        display names, device names, area names, integration names, and label names.
+      required: false
+      selector:
+        text:
+    areas:
+      name: Areas
+      description: Filter by specific areas (OR logic within this filter).
+      required: false
+      selector:
+        area:
+          multiple: true
+    devices:
+      name: Devices
+      description: Filter by specific devices (OR logic within this filter).
+      required: false
+      selector:
+        device:
+          multiple: true
+    domains:
+      name: Domains
+      description: 
+        - Filter by specific entity domains (OR logic within this filter).
+      required: false
+      example: |-
+        - light
+        - switch
+      selector:
+        select:
+          multiple: true
+          custom_value: true
+          options:
+            - value: ai_task
+              label: Ai Task
+            - value: automation
+              label: Automation
+            - value: binary_sensor
+              label: Binary Sensor
+            - value: button
+              label: Button
+            - value: camera
+              label: Camera
+            - value: climate
+              label: Climate
+            - value: conversation
+              label: Conversation
+            - value: counter
+              label: Counter
+            - value: cover
+              label: Cover
+            - value: device_tracker
+              label: Device Tracker
+            - value: event
+              label: Event
+            - value: fan
+              label: Fan
+            - value: humidifier
+              label: Humidifier
+            - value: image
+              label: Image
+            - value: input_boolean
+              label: Input Boolean
+            - value: input_number
+              label: Input Number
+            - value: input_select
+              label: Input Select
+            - value: input_text
+              label: Input Text
+            - value: light
+              label: Light
+            - value: lock
+              label: Lock
+            - value: media_player
+              label: Media Player
+            - value: number
+              label: Number
+            - value: person
+              label: Person
+            - value: remote
+              label: Remote
+            - value: scene
+              label: Scene
+            - value: script
+              label: Script
+            - value: select
+              label: Select
+            - value: sensor
+              label: Sensor
+            - value: sun
+              label: Sun
+            - value: switch
+              label: Switch
+            - value: text
+              label: Text
+            - value: time
+              label: Time
+            - value: update
+              label: Update
+            - value: vacuum
+              label: Vacuum
+            - value: weather
+              label: Weather
+            - value: zone
+              label: Zone            
+    integrations:
+      name: Integrations
+      description: Filter by specific integrations (OR logic within this filter).
+      required: false
+      selector:
+        select:
+          multiple: true
+          custom_value: true
+          mode: dropdown
+          options:
+            - value: mqtt
+              label: MQTT
+            - value: zwave_js
+              label: Z-Wave JS
+            - value: zigbee2mqtt
+              label: Zigbee2MQTT
+            - value: zha
+              label: ZHA (Zigbee)
+            - value: esphome
+              label: ESPHome
+            - value: tasmota
+              label: Tasmota
+            - value: hue
+              label: Philips Hue
+            - value: homekit_controller
+              label: HomeKit
+            - value: cast
+              label: Google Cast
+            - value: spotify
+              label: Spotify
+            - value: weather
+              label: Weather
+            - value: sun
+              label: Sun
+            - value: moon
+              label: Moon
+    status:
+      name: Status
+      description: Filter by entity status (OR logic within this filter).
+      required: false
+      example: |-
+        - hidden
+      selector:
+        select:
+          multiple: true
+          mode: dropdown
+          options:
+            - value: available
+              label: Available
+            - value: unavailable
+              label: Unavailable
+            - value: enabled
+              label: Enabled
+            - value: disabled
+              label: Disabled
+            - value: visible
+              label: Visible
+            - value: hidden
+              label: Hidden
+            - value: unmanageable
+              label: Unmanageable
+    label_id:
+      name: Labels
+      description: Filter by specific labels (OR logic within this filter).
+      required: false
+      selector:
+        label:
+          multiple: true
+    values:
+      name: Values
+      description: >-
+        Additional entity information to include in the response.
+        If none selected, returns only entity IDs for minimal response.
+      required: false
+      example: |-
+        - name
+        - area
+        - integration
+        - status
+      selector:
+        select:
+          multiple: true
+          mode: dropdown
+          options:
+            - value: name
+              label: Name
+            - value: device
+              label: Device
+            - value: area
+              label: Area
+            - value: integration
+              label: Integration
+            - value: status
+              label: Status
+            - value: icon
+              label: Icon
+            - value: created
+              label: Created
+            - value: modified
+              label: Modified
+            - value: labels
+              label: Labels
+    advanced_fields:
+      name: Advanced
+      collapsed: true
+      fields:
+        limit:
+          name: Limit
+          description: >-
+            Maximum number of entities to return. Defaults to 50,000 if not specified.
+            Maximum allowed is 50,000 for safety.
+          required: false
+          default: 50000
+          selector:
+            number:
+              min: 1
+              max: 50000
