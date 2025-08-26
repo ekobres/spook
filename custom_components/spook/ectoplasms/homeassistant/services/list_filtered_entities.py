@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.homeassistant import DOMAIN
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
 
 # Safety limit for number of entities to return
 MAX_ENTITIES_LIMIT = 50000
+UNAVAILABLE_STATES = ("unavailable", "unknown")
 
 
 class SpookService(AbstractSpookService):
@@ -30,9 +32,105 @@ class SpookService(AbstractSpookService):
     service = "list_filtered_entities"
     supports_response = SupportsResponse.ONLY
 
+    async def async_handle_service(self, call: ServiceCall) -> ServiceResponse:
+        """Handle the service call."""
+        # Parse and validate input parameters
+        filters, values, limit = self._parse_service_call(call)
+
+        # Get matching entities
+        matching_entities = self._find_matching_entities(filters, values, limit)
+
+        # Sort and return results
+        return self._format_response(matching_entities)
+
+    def _parse_service_call(self, call: ServiceCall) -> tuple[dict[str, Any], list[str], int]:
+        """Parse and validate service call parameters."""
+        search = call.data.get("search", "")
+        areas = call.data.get("areas", [])
+        devices = call.data.get("devices", [])
+        domains = call.data.get("domains", [])
+        integrations = call.data.get("integrations", [])
+        status = call.data.get("status", [])
+        label_id = call.data.get("label_id", [])
+        values = call.data.get("values", [])
+        limit = call.data.get("limit")
+
+        # Apply safety cap
+        if limit is None or limit > MAX_ENTITIES_LIMIT:
+            limit = MAX_ENTITIES_LIMIT
+
+        filters = {
+            "search": search,
+            "areas": areas,
+            "devices": devices,
+            "domains": domains,
+            "integrations": integrations,
+            "status": status,
+            "labels": label_id,
+        }
+
+        return filters, values, limit
+
+    def _find_matching_entities(
+        self,
+        filters: dict[str, Any],
+        values: list[str],
+        limit: int,
+    ) -> list[str | dict[str, Any]]:
+        """Find entities matching the filter criteria."""
+        entity_registry = er.async_get(self.hass)
+        matching_entities: list[str | dict[str, Any]] = []
+
+        # 1) Enumerate registry entities first
+        registry_entity_ids: set[str] = set()
+        for entity_entry in entity_registry.entities.values():
+            registry_entity_ids.add(entity_entry.entity_id)
+
+            entity_data = self._get_entity_data(entity_entry)
+            if (result := self._collect_entity_match(entity_entry, entity_data, filters, values)) is not None:
+                matching_entities.append(result)
+                if len(matching_entities) >= limit:
+                    return matching_entities
+
+        # 2) Include state-only entities (present in states but not in registry)
+        for state in list(self.hass.states.async_all()):
+            if state.entity_id in registry_entity_ids:
+                continue
+
+            # Build pseudo entry and minimal data for state-only rows
+            entry, entity_data = self._get_state_only_entity_data(state.entity_id)
+
+            # Check search and filters and collect
+            if (result := self._collect_entity_match(entry, entity_data, filters, values)) is not None:
+                matching_entities.append(result)
+                if len(matching_entities) >= limit:
+                    break
+
+        return matching_entities
+
+    def _format_response(self, matching_entities: list[str | dict[str, Any]]) -> ServiceResponse:
+        """Format the final service response."""
+        # Stable sort by entity_id (for string values) or by entity_id key (for dict values)
+        if matching_entities and isinstance(matching_entities[0], dict):
+            # Sort dictionaries by entity_id key
+            dict_entities = [e for e in matching_entities if isinstance(e, dict)]
+            dict_entities.sort(key=lambda entity: str(entity.get("entity_id", "")))
+            matching_entities[:] = dict_entities
+        else:
+            # Sort strings directly
+            string_entities = [e for e in matching_entities if isinstance(e, str)]
+            string_entities.sort()
+            matching_entities[:] = string_entities
+
+        return {
+            "count": len(matching_entities),
+            "entities": matching_entities,
+        }
+
+
     def _matches_search(
         self,
-        entity_entry: er.RegistryEntry,
+        entity_entry: Any,
         search_term: str,
         entity_data: dict[str, Any],
     ) -> bool:
@@ -52,17 +150,18 @@ class SpookService(AbstractSpookService):
             entity_data.get("integration_name") or "",
         ]
 
+        # Also allow searching on status keywords (e.g., "unmanageable")
+        search_fields.extend(self._status_terms(entity_data.get("status")))
+
         # Check main fields
-        for field in search_fields:
-            if search_lower in field.lower():
-                return True
+        if any(search_lower in field.lower() for field in search_fields):
+            return True
 
         # Check label names
-        for label in entity_data.get("labels", []):
-            if label.get("label_name") and search_lower in label["label_name"].lower():
-                return True
-
-        return False
+        return any(
+            label.get("label_name") and search_lower in label["label_name"].lower()
+            for label in entity_data.get("labels", [])
+        )
 
     def _get_entity_data(self, entity_entry: er.RegistryEntry) -> dict[str, Any]:
         """Get comprehensive entity data."""
@@ -81,11 +180,13 @@ class SpookService(AbstractSpookService):
         # Area information (only if area exists)
         area_registry = ar.async_get(self.hass)
         area_id = entity_entry.area_id
-        if not area_id and entity_entry.device_id:
+        if (
+            not area_id
+            and entity_entry.device_id
+            and (device := device_registry.async_get(entity_entry.device_id))
+        ):
             # Get area from device if entity doesn't have one directly
-            device_registry = dr.async_get(self.hass)
-            if device := device_registry.async_get(entity_entry.device_id):
-                area_id = device.area_id
+            area_id = device.area_id
 
         if area_id and (area := area_registry.async_get_area(area_id)):
             data["area_id"] = area.id
@@ -103,7 +204,7 @@ class SpookService(AbstractSpookService):
         # Created/Modified timestamps
         created_at = getattr(entity_entry, "created_at", None)
         data["created"] = created_at.isoformat() if isinstance(created_at, datetime) else created_at
-        
+
         modified_at = getattr(entity_entry, "modified_at", None)
         data["modified"] = modified_at.isoformat() if isinstance(modified_at, datetime) else modified_at
 
@@ -134,25 +235,74 @@ class SpookService(AbstractSpookService):
     def _get_status_info(self, entity_entry: er.RegistryEntry) -> dict[str, Any]:
         """Get status information for entity."""
         state = self.hass.states.get(entity_entry.entity_id)
-        
-        status = {}
-        
+
+        status: dict[str, Any] = {}
+
         # Only include keys with truthy values
         if entity_entry.disabled_by:
             status["disabled_by"] = entity_entry.disabled_by
-            
+
         if entity_entry.hidden_by:
             status["hidden_by"] = entity_entry.hidden_by
-            
-        if state is not None and state.state not in ("unavailable", "unknown"):
-            status["available"] = True
-            
-        if state is not None and state.state == "unknown":
-            status["unknown"] = True
-            
-        # Unmanageable: entities without config_entry_id (cannot be managed from UI)
-        if entity_entry.config_entry_id is None:
+
+        # Merge status inferred from the current state
+        status.update(self._status_from_state(state))
+
+        # Unmanageable for registry entities: honor runtime "readonly" flag if present
+        # (state-only entities are handled separately in _get_state_only_entity_data)
+        if getattr(entity_entry, "readonly", False):
             status["unmanageable"] = True
+
+        return status
+
+    def _get_state_only_entity_data(self, entity_id: str) -> tuple[SimpleNamespace, dict[str, Any]]:
+        """Build a minimal entity_entry-like object and data for state-only entities.
+
+        - No device/area/labels/integration_name/icon/dates.
+        - Status reflects availability and unmanageable=True.
+        """
+        state = self.hass.states.get(entity_id)
+        domain = entity_id.split(".", 1)[0]
+
+        # Pseudo entry providing the minimal attributes used by our helpers
+        entry = SimpleNamespace(
+            entity_id=entity_id,
+            platform=domain,
+        )
+
+        data: dict[str, Any] = {}
+
+        # Derive status from state and mark as unmanageable (state-only)
+        status: dict[str, Any] = self._status_from_state(state)
+        status["unmanageable"] = True
+        data["status"] = status
+
+        # Explicitly set properties we support in searches/output
+        data["labels"] = []
+        data["icon"] = None
+        data["created"] = None
+        data["modified"] = None
+        data["integration_name"] = None
+
+        return entry, data
+
+    def _status_from_state(self, state: Any) -> dict[str, Any]:
+        """Derive status flags from a Home Assistant state object.
+
+        Returns only truthy keys among: available, unknown, not_provided.
+        """
+        status: dict[str, Any] = {}
+        if state is None:
+            return status
+
+        if state.state not in UNAVAILABLE_STATES:
+            status["available"] = True
+        if state.state == "unknown":
+            status["unknown"] = True
+
+        attrs = getattr(state, "attributes", None)
+        if isinstance(attrs, dict) and attrs.get("restored", False):
+            status["not_provided"] = True
 
         return status
 
@@ -237,6 +387,7 @@ class SpookService(AbstractSpookService):
             "disabled": lambda s: bool(s.get("disabled_by")),
             "visible": lambda s: not s.get("hidden_by"),
             "hidden": lambda s: bool(s.get("hidden_by")),
+            "not_provided": lambda s: s.get("not_provided", False),
             "unmanageable": lambda s: s.get("unmanageable", False),
         }
 
@@ -246,81 +397,43 @@ class SpookService(AbstractSpookService):
             for status_filter in status_filters
         )
 
-    async def async_handle_service(self, call: ServiceCall) -> ServiceResponse:
-        """Handle the service call."""
-        # Parse and validate input parameters
-        filters, values, limit = self._parse_service_call(call)
-
-        # Get matching entities
-        matching_entities = self._find_matching_entities(filters, values, limit)
-
-        # Sort and return results
-        return self._format_response(matching_entities)
-
-    def _parse_service_call(self, call: ServiceCall) -> tuple[dict[str, Any], list[str], int]:
-        """Parse and validate service call parameters."""
-        search = call.data.get("search", "")
-        areas = call.data.get("areas", [])
-        devices = call.data.get("devices", [])
-        domains = call.data.get("domains", [])
-        integrations = call.data.get("integrations", [])
-        status = call.data.get("status", [])
-        label_id = call.data.get("label_id", [])
-        values = call.data.get("values", [])
-        limit = call.data.get("limit")
-
-        # Apply safety cap
-        if limit is None or limit > MAX_ENTITIES_LIMIT:
-            limit = MAX_ENTITIES_LIMIT
-
-        filters = {
-            "search": search,
-            "areas": areas,
-            "devices": devices,
-            "domains": domains,
-            "integrations": integrations,
-            "status": status,
-            "labels": label_id,
-        }
-
-        return filters, values, limit
-
-    def _find_matching_entities(
+    def _collect_entity_match(
         self,
+        entity_entry: Any,
+        entity_data: dict[str, Any],
         filters: dict[str, Any],
         values: list[str],
-        limit: int,
-    ) -> list[str | dict[str, Any]]:
-        """Find entities matching the filter criteria."""
-        entity_registry = er.async_get(self.hass)
-        matching_entities = []
+    ) -> str | dict[str, Any] | None:
+        """Return formatted match or None after applying search and filters."""
+        if not self._matches_search(entity_entry, filters.get("search", ""), entity_data):
+            return None
+        if not self._entity_matches_filters(entity_entry, entity_data, filters):
+            return None
+        if values:
+            return self._build_entity_result(entity_entry, entity_data, values)
+        return entity_entry.entity_id
 
-        for entity_entry in entity_registry.entities.values():
-            # Get comprehensive entity data
-            entity_data = self._get_entity_data(entity_entry)
-
-            # Check search filter
-            if not self._matches_search(entity_entry, filters.get("search", ""), entity_data):
-                continue
-
-            # Check all other filters
-            if not self._entity_matches_filters(entity_entry, entity_data, filters):
-                continue
-
-            # Add to results
-            if values:
-                # Include requested values
-                result = self._build_entity_result(entity_entry, entity_data, values)
-                matching_entities.append(result)
-            else:
-                # Minimal format - just entity IDs
-                matching_entities.append(entity_entry.entity_id)
-
-            # Apply limit
-            if len(matching_entities) >= limit:
-                break
-
-        return matching_entities
+    def _status_terms(self, status: dict[str, Any] | None) -> list[str]:
+        """Return search terms derived from status for search matching."""
+        if not status:
+            return []
+        terms: list[str] = []
+        if status.get("unmanageable"):
+            terms.extend(("unmanageable", "readonly"))
+        if status.get("not_provided"):
+            # Frontend labels restored states as "Not provided"
+            terms.extend(("not_provided", "restored"))
+        if status.get("disabled_by"):
+            terms.append("disabled")
+        if status.get("hidden_by"):
+            terms.append("hidden")
+        # Keep available/unavailable simple; we don't fabricate extra terms
+        if status.get("available"):
+            terms.append("available")
+        else:
+            # If not available, expose "unavailable" as a term
+            terms.append("unavailable")
+        return terms
 
     def _build_entity_result(
         self,
@@ -333,7 +446,7 @@ class SpookService(AbstractSpookService):
 
         # Value mapping - directly add data that exists
         value_mapping = {
-            "name": lambda: entity_data["name"],
+            "name": lambda: entity_data.get("name"),
             "device": lambda: (entity_data.get("device_id") and {
                 "device_id": entity_data["device_id"],
                 "device_name": entity_data["device_name"]
@@ -343,13 +456,13 @@ class SpookService(AbstractSpookService):
                 "area_name": entity_data["area_name"]
             }),
             "integration": lambda: {
-                "integration_name": entity_data["integration_name"]
+                "integration_name": entity_data.get("integration_name")
             },
-            "status": lambda: entity_data["status"],
-            "icon": lambda: entity_data["icon"],
-            "created": lambda: entity_data["created"],
-            "modified": lambda: entity_data["modified"],
-            "labels": lambda: entity_data["labels"],
+            "status": lambda: entity_data.get("status"),
+            "icon": lambda: entity_data.get("icon"),
+            "created": lambda: entity_data.get("created"),
+            "modified": lambda: entity_data.get("modified"),
+            "labels": lambda: entity_data.get("labels"),
         }
 
         for value in values:
@@ -362,22 +475,3 @@ class SpookService(AbstractSpookService):
                         result[value] = data  # Single value
 
         return result
-
-    def _format_response(self, matching_entities: list[str | dict[str, Any]]) -> ServiceResponse:
-        """Format the final service response."""
-        # Stable sort by entity_id (for string values) or by entity_id key (for dict values)
-        if matching_entities and isinstance(matching_entities[0], dict):
-            # Sort dictionaries by entity_id key
-            dict_entities = [e for e in matching_entities if isinstance(e, dict)]
-            dict_entities.sort(key=lambda entity: str(entity.get("entity_id", "")))
-            matching_entities[:] = dict_entities
-        else:
-            # Sort strings directly
-            string_entities = [e for e in matching_entities if isinstance(e, str)]
-            string_entities.sort()
-            matching_entities[:] = string_entities
-
-        return {
-            "count": len(matching_entities),
-            "entities": matching_entities,
-        }
